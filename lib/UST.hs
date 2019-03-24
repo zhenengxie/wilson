@@ -2,72 +2,52 @@ module UST where
 
 import           Data.Map.Strict                ( Map )
 import qualified Data.Map.Strict               as M
-                                                ( keysSet
-                                                , empty
-                                                , lookup
-                                                , insert
-                                                , fromSet
-                                                )
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as S
-                                                ( singleton
-                                                , delete
-                                                , lookupMin
-                                                , insert
-                                                , empty
-                                                , union
-                                                , difference
-                                                , member
-                                                , fromList
-                                                )
 import           Data.Random                    ( RVar )
 import           Data.Random.List               ( randomElement )
 
 type Graph a = Map a [a]
 type Coord = (Int, Int)
 
-randomMaze :: Int -> Int -> RVar (Set (Coord, Coord))
-randomMaze w h = randomUST (S.singleton (0, 0)) (S.delete (0, 0) vertices) grid
+rectLattice :: Int -> Int -> Graph (Int, Int)
+rectLattice w h = M.fromSet nbhrs vertices
  where
-  grid     = rectLattice w h
-  vertices = M.keysSet grid
-
-randomUST :: Ord a => Set a -> Set a -> Graph a -> RVar (Set (a, a))
-randomUST seen unseen graph = case S.lookupMin unseen of -- minimum is just a way of choosing an arb element
-  Just initial -> do
-    walk <- hittingPath graph seen initial initial M.empty
-    let newlySeen =
-          foldr (\(v, w) s -> S.insert v . S.insert w $ s) S.empty walk
-    partialPath <- randomUST (S.union newlySeen seen)
-                             (S.difference unseen newlySeen)
-                             graph
-    return $ S.union walk partialPath
-  _ -> return S.empty
+  vertices = S.fromList [ (i, j) | i <- [0 .. w], j <- [0 .. h] ]
+  nbhrs (i, j) = filter inRange [(i - 1, j), (i + 1, j), (i, j - 1), (i, j + 1)]
+  inRange (i, j) = 0 <= i && i <= w && 0 <= j && j <= h
 
 randomNbhr :: Ord a => Graph a -> a -> RVar (Maybe a)
 randomNbhr graph v = case M.lookup v graph of
   Just nbhrs | not (null nbhrs) -> Just <$> randomElement nbhrs
   _                             -> return Nothing
 
-hittingPath
-  :: Ord a => Graph a -> Set a -> a -> a -> Map a a -> RVar (Set (a, a))
-hittingPath graph seen initial v walk
-  | v `S.member` seen = return $ realiseWalk initial walk
-  | otherwise = do
-    nbhr <- randomNbhr graph v
-    case nbhr of
-      (Just w) -> hittingPath graph seen initial w (M.insert v w walk)
-      _        -> return $ realiseWalk initial walk
+randomLERW :: Ord a => Graph a -> Set a -> a -> RVar (Map a a)
+randomLERW graph seen v0 = go v0 M.empty
+  where go v walk = randomNbhr graph v >>= \nbhr -> case nbhr of
+          Just w | v `S.notMember` seen -> go w (M.insert v w walk)
+          _ -> return walk
 
-realiseWalk :: Ord a => a -> Map a a -> (Set (a, a))
-realiseWalk v walk = case M.lookup v walk of
-  Just w  -> S.insert (v, w) (realiseWalk w walk)
-  Nothing -> S.empty
+randomUST :: Ord a => Graph a -> a -> RVar (Map a a)
+randomUST graph seed = randomUSTHelper graph seen unseen 
+  where
+    vertices = M.keysSet graph
+    seen = S.singleton seed
+    unseen = S.delete seed vertices
 
-rectLattice :: Int -> Int -> Graph (Int, Int)
-rectLattice w h = M.fromSet nbhrs vertices
- where
-  vertices = S.fromList [ (i, j) | i <- [0 .. w], j <- [0 .. h] ]
-  nbhrs (i, j) =
-    filter inRange [(i - 1, j), (i + 1, j), (i, j - 1), (i, j + 1)]
-  inRange (i, j) = 0 <= i && i <= w && 0 <= j && j <= h
+randomUSTHelper :: Ord a => Graph a -> Set a -> Set a -> RVar (Map a a)
+randomUSTHelper graph seen unseen = case S.lookupMax unseen of
+  Just v -> do
+    branch <- randomLERW graph seen v
+    let newlySeen = exploreFrom v branch
+    restOfTree <- randomUSTHelper graph (S.union seen newlySeen) (S.difference unseen newlySeen)
+    return $ M.union restOfTree branch
+
+  _ -> return M.empty
+  where
+    exploreFrom v walk = case M.lookup v walk of
+      (Just w) -> S.insert v (exploreFrom w walk)
+      _ -> S.singleton v
+
+randomMaze :: Int -> Int -> RVar [(Coord, Coord)]
+randomMaze w h = M.toList <$> randomUST (rectLattice w h) (0, 0)

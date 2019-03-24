@@ -31,3 +31,16 @@ library
                        gloss,
                        random-fu,
                        containers
+
+test-suite reference
+  main-is:             Spec.hs
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  default-language:    Haskell2010
+  build-depends:       base >= 4.7 && < 5,
+                       gloss,
+                       random-fu,
+                       containers,
+                       QuickCheck,
+                       hspec,
+                       wilson
