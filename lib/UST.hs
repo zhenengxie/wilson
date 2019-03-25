@@ -23,24 +23,23 @@ randomNbhr graph v = case M.lookup v graph of
   _                             -> return Nothing
 
 randomLERW :: Ord a => Graph a -> Set a -> a -> RVar (Map a a)
-randomLERW graph seen v0 = go v0 M.empty
+randomLERW graph unseen v0 = go v0 M.empty
   where go v walk = randomNbhr graph v >>= \nbhr -> case nbhr of
-          Just w | v `S.notMember` seen -> go w (M.insert v w walk)
+          Just w | v `S.member` unseen -> go w (M.insert v w walk)
           _ -> return walk
 
 randomUST :: Ord a => Graph a -> a -> RVar (Map a a)
-randomUST graph seed = randomUSTHelper graph seen unseen 
+randomUST graph seed = randomUSTHelper graph unseen 
   where
     vertices = M.keysSet graph
-    seen = S.singleton seed
     unseen = S.delete seed vertices
 
-randomUSTHelper :: Ord a => Graph a -> Set a -> Set a -> RVar (Map a a)
-randomUSTHelper graph seen unseen = case S.lookupMax unseen of
+randomUSTHelper :: Ord a => Graph a -> Set a -> RVar (Map a a)
+randomUSTHelper graph unseen = case S.lookupMax unseen of
   Just v -> do
-    branch <- randomLERW graph seen v
+    branch <- randomLERW graph unseen v
     let newlySeen = exploreFrom v branch
-    restOfTree <- randomUSTHelper graph (S.union seen newlySeen) (S.difference unseen newlySeen)
+    restOfTree <- randomUSTHelper graph (S.difference unseen newlySeen)
     return $ M.union restOfTree branch
 
   _ -> return M.empty

@@ -66,6 +66,7 @@ loopErase :: Ord a => Map a a -> a -> Map a a
 loopErase walk v = go v M.empty
   where go v acc = case M.lookup v walk of
           Just w | w `M.notMember` acc -> go w (M.insert v w acc)
+                 | otherwise -> M.insert v w acc
           _ -> acc
 
 explore :: Ord a => Map a a -> a -> Set a
