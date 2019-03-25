@@ -20,7 +20,9 @@ executable wilson
   build-depends:       base >= 4.7 && < 5,
                        gloss,
                        random-fu,
+                       random-source,
                        containers,
+                       microlens-platform,
                        wilson
                        
 library
