@@ -17,6 +17,7 @@ executable wilson
   hs-source-dirs:      src
   main-is:             Main.hs
   default-language:    Haskell2010
+  ghc-options:         -O2 -threaded
   build-depends:       base >= 4.7 && < 5,
                        gloss,
                        random-fu,
